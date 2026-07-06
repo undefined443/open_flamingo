@@ -199,7 +199,7 @@ print("Generated text: ", tokenizer.decode(generated_text[0]))
 ```
 
 # Training
-We provide training scripts in `open_flamingo/train`. We provide an example Slurm script in `open_flamingo/scripts/run_train.py`, as well as the following example command:
+We provide training scripts in `open_flamingo/train`. We provide an example single-node `torchrun` script in `open_flamingo/scripts/run_train.sh`, and an example Slurm script in `open_flamingo/scripts/run_train_slurm.sh`, as well as the following example command:
 ```
 torchrun --nnodes=1 --nproc_per_node=4 open_flamingo/train/train.py \
   --lm_path anas-awadalla/mpt-1b-redpajama-200b \

@@ -1,19 +1,28 @@
 #!/bin/bash
-# Single-node evaluation launched directly with torchrun (no Slurm required).
-# Adjust --nproc_per_node to the number of GPUs you want to use.
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=2
+#SBATCH --gpus-per-task=1
 
 <<com
-Example torchrun evaluation script.
+Example Slurm evaluation script. 
 Notes:
-- VQAv2 test-dev and test-std annotations are not publicly available.
+- VQAv2 test-dev and test-std annotations are not publicly available. 
   To evaluate on these splits, please follow the VQAv2 instructions and submit to EvalAI.
   This script will evaluate on the val split.
 com
 
 export PYTHONFAULTHANDLER=1
 export CUDA_LAUNCH_BLOCKING=0
+export HOSTNAMES=`scontrol show hostnames "$SLURM_JOB_NODELIST"`
+export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
+export MASTER_PORT=$(shuf -i 0-65535 -n 1)
+export COUNT_NODE=`scontrol show hostnames "$SLURM_JOB_NODELIST" | wc -l`
 
-torchrun --nnodes=1 --nproc_per_node=2 open_flamingo/eval/evaluate.py \
+echo go $COUNT_NODE
+echo $HOSTNAMES
+
+export PYTHONPATH="$PYTHONPATH:open_flamingo"
+srun --cpu_bind=v --accel-bind=gn python open_flamingo/open_flamingo/eval/evaluate.py \
     --vision_encoder_path ViT-L-14 \
     --vision_encoder_pretrained openai\
     --lm_path anas-awadalla/mpt-1b-redpajama-200b \

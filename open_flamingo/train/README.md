@@ -27,7 +27,7 @@ Models trained with ChatGPT-generated sequences:
 * OpenFlamingo-4B-vitl-rpj3b-langinstruct
 
 ## Example training command
-We provide a sample Slurm training script in `scripts/`. You can also modify the following command:
+We provide a sample single-node `torchrun` training script (`scripts/run_train.sh`) and a sample Slurm training script (`scripts/run_train_slurm.sh`). You can also modify the following command:
 
 ```
 torchrun --nnodes=1 --nproc_per_node=4 train.py \
