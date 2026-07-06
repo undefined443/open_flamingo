@@ -61,15 +61,20 @@ all = [
 
 [dependency-groups]
 dev = [
-    "black",
-    "mypy",
-    "pylint",
+    "ruff",
+    "pyright",
     "pytest",
     "requests",
 ]
 
 [tool.setuptools.packages.find]
 include = ["open_flamingo*"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.pyright]
+include = ["open_flamingo"]
 
 [tool.uv.sources]
 torch = { index = "pytorch-cu132" }
