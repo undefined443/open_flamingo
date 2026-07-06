@@ -115,6 +115,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# uv
+uv.lock
+
 # Pycharm project settings
 .idea
 
