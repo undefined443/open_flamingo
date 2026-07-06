@@ -18,14 +18,12 @@ class EvalModel(BaseEvalModel):
     """
 
     def __init__(self, model_args):
-        assert (
-            "processor_path" in model_args and "lm_path" in model_args
-        ), "BLIP-2 requires processor_path, lm_path, and device arguments to be specified"
+        assert "processor_path" in model_args and "lm_path" in model_args, (
+            "BLIP-2 requires processor_path, lm_path, and device arguments to be specified"
+        )
 
         self.processor = Blip2Processor.from_pretrained(model_args["processor_path"])
-        self.model = Blip2ForConditionalGeneration.from_pretrained(
-            model_args["lm_path"]
-        )
+        self.model = Blip2ForConditionalGeneration.from_pretrained(model_args["lm_path"])
         self.model.eval()
         self.processor.tokenizer.padding_side = "left"
         self.lm_name = model_args["lm_path"].split("/")[-1]
@@ -41,25 +39,17 @@ class EvalModel(BaseEvalModel):
             (batch_size, channels, height, width).
         """
         batch_images = None
-        assert all(
-            len(example) == 1 for example in batch
-        ), "BLIP-2 only supports one image per example"
+        assert all(len(example) == 1 for example in batch), "BLIP-2 only supports one image per example"
 
         for example in batch:
             assert len(example) == 1, "BLIP-2 only supports one image per example"
             batch_images = torch.cat(
                 [
                     batch_images,
-                    self.processor.image_processor(example, return_tensors="pt")[
-                        "pixel_values"
-                    ],
+                    self.processor.image_processor(example, return_tensors="pt")["pixel_values"],
                 ]
                 if batch_images is not None
-                else [
-                    self.processor.image_processor(example, return_tensors="pt")[
-                        "pixel_values"
-                    ]
-                ],
+                else [self.processor.image_processor(example, return_tensors="pt")["pixel_values"]],
                 dim=0,
             )
         return batch_images
@@ -97,9 +87,7 @@ class EvalModel(BaseEvalModel):
         return self.processor.tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
     def get_vqa_prompt(self, question, answer=None) -> str:
-        return (
-            f"Question:{question} Short answer:{answer if answer is not None else ''}"
-        )
+        return f"Question:{question} Short answer:{answer if answer is not None else ''}"
 
     def get_caption_prompt(self, caption=None) -> str:
         return f"A photo of {caption if caption is not None else ''}"
@@ -112,6 +100,4 @@ class EvalModel(BaseEvalModel):
         use_cache: bool,
         normalize_length: bool,
     ):
-        raise NotImplementedError(
-            "BLIP-2 classification-based evaluation not implemented"
-        )
+        raise NotImplementedError("BLIP-2 classification-based evaluation not implemented")

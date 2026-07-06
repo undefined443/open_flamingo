@@ -1,4 +1,4 @@
-""" Main training script """
+"""Main training script"""
 
 import argparse
 import glob
@@ -123,9 +123,7 @@ def main():
         action="store_true",
         help="if True, we freeze the LM embeddings during training. Otherwise, we train the <image> and <|endofchunk|> embeddings.",
     )
-    parser.add_argument(
-        "--logging_steps", type=int, default=100, help="log loss every n steps"
-    )
+    parser.add_argument("--logging_steps", type=int, default=100, help="log loss every n steps")
 
     # data args
     parser.add_argument(
@@ -168,9 +166,7 @@ def main():
         type=str,
         help="url used to set up distributed training",
     )
-    parser.add_argument(
-        "--dist-backend", default="nccl", type=str, help="distributed backend"
-    )
+    parser.add_argument("--dist-backend", default="nccl", type=str, help="distributed backend")
     parser.add_argument(
         "--horovod",
         default=False,
@@ -195,9 +191,7 @@ def main():
         action="store_true",
         help="Passed into the FSDP constructor. Enables param_groups and gradient masking for weight_decay. Does not work with OPT.",
     )
-    parser.add_argument(
-        "--fsdp_sharding_strategy", default="full", type=str, choices=["full", "hybrid"]
-    )
+    parser.add_argument("--fsdp_sharding_strategy", default="full", type=str, choices=["full", "hybrid"])
 
     # wandb args
     parser.add_argument("--report_to_wandb", default=False, action="store_true")
@@ -287,14 +281,11 @@ def main():
         if len(checkpoint_list) == 0:
             print(f"Found no checkpoints for run {args.run_name}.")
         else:
-            args.resume_from_checkpoint = sorted(
-                checkpoint_list, key=lambda x: int(x.split("_")[-1].split(".")[0])
-            )[-1]
-            print(
-                f"Found checkpoint {args.resume_from_checkpoint} for run {args.run_name}."
-            )
+            args.resume_from_checkpoint = sorted(checkpoint_list, key=lambda x: int(x.split("_")[-1].split(".")[0]))[-1]
+            print(f"Found checkpoint {args.resume_from_checkpoint} for run {args.run_name}.")
 
     resume_from_epoch = 0
+    checkpoint = None
     if args.resume_from_checkpoint is not None:
         if args.rank == 0:
             print(f"Loading checkpoint from {args.resume_from_checkpoint}")
@@ -310,9 +301,7 @@ def main():
     # Initialize FSDP / DDP, and ensure the model is on GPU
     print(f"Initializing distributed training with {args.world_size} GPUs.")
     if args.fsdp:
-        print(
-            f"Before FSDP parameter num: {sum(p.numel() for p in model.parameters())} on rank {args.rank}"
-        )
+        print(f"Before FSDP parameter num: {sum(p.numel() for p in model.parameters())} on rank {args.rank}")
 
         # init MixedPrecision
         if args.precision != "fp32":
@@ -328,7 +317,7 @@ def main():
         # init process groups
         if args.fsdp_sharding_strategy == "hybrid":
             intra_node_group, inter_node_group = _init_intra_and_inter_node_groups(
-                _get_default_group()
+                _get_default_group(), torch.cuda.device_count()
             )
             args.my_group = intra_node_group  # for optimizer saving
             process_group = (intra_node_group, inter_node_group)  # for FSDP init
@@ -354,12 +343,8 @@ def main():
         model.wrap_fsdp(wrapper_kwargs, device_id)
         ddp_model = model
 
-        print(
-            f"After FSDP parameter num: {sum(p.numel() for p in model.parameters())} on rank {args.rank}"
-        )
-        print(
-            f"After FSDP {torch.cuda.memory_allocated()/1024**3:.3} GB on rank {args.rank}"
-        )
+        print(f"After FSDP parameter num: {sum(p.numel() for p in model.parameters())} on rank {args.rank}")
+        print(f"After FSDP {torch.cuda.memory_allocated() / 1024**3:.3} GB on rank {args.rank}")
 
     else:
         model = model.to(device_id)
@@ -375,17 +360,18 @@ def main():
         apply_activation_checkpointing(
             ddp_model,
             checkpoint_wrapper_fn=non_reentrant_wrapper,
-            check_fn=lambda m: getattr(m, "_use_gradient_checkpointing", False)
-            and not isinstance(m, FSDP)
-            and not isinstance(m, CheckpointWrapper),
+            check_fn=lambda m: (
+                getattr(m, "_use_gradient_checkpointing", False)
+                and not isinstance(m, FSDP)
+                and not isinstance(m, CheckpointWrapper)
+            ),
         )
 
     # Initialize optimizer
     params_to_optimize = ddp_model.named_parameters()
     params_to_optimize = list(
         filter(
-            lambda x: x[1].requires_grad
-            and not getattr(x[1], "exclude_from_optimizer", False),
+            lambda x: x[1].requires_grad and not getattr(x[1], "exclude_from_optimizer", False),
             params_to_optimize,
         )
     )
@@ -403,9 +389,7 @@ def main():
                 {"params": params_without_wd, "weight_decay": 0.0},
             ]
 
-        optimizer = torch.optim.AdamW(
-            get_grouped_params(params_to_optimize), lr=args.learning_rate
-        )
+        optimizer = torch.optim.AdamW(get_grouped_params(params_to_optimize), lr=args.learning_rate)
     else:
         # unclear if we should be using no weight decay or small weight decay for all parameters
         optimizer = torch.optim.AdamW(
@@ -418,15 +402,13 @@ def main():
     if args.resume_from_checkpoint is not None:
         osd = checkpoint["optimizer_state_dict"]
         if args.fsdp:
-            osd = FSDP.optim_state_dict_to_load(osd, ddp_model, optimizer)
+            osd = FSDP.optim_state_dict_to_load(ddp_model, optimizer, osd)
         optimizer.load_state_dict(osd)
 
     # Initialize data loaders
     laion_dataset = get_data(args, image_processor, tokenizer, "image_text")
     mmc4_dataset = get_data(args, image_processor, tokenizer, "mmc4")
-    total_training_steps = (
-        (args.train_num_samples_mmc4) // (args.batch_size_mmc4 * args.world_size)
-    ) * args.num_epochs
+    total_training_steps = ((args.train_num_samples_mmc4) // (args.batch_size_mmc4 * args.world_size)) * args.num_epochs
 
     if args.rank == 0:
         print(f"Total training steps: {total_training_steps}")
@@ -445,9 +427,7 @@ def main():
             num_training_steps=total_training_steps,
         )
     else:
-        lr_scheduler = get_constant_schedule_with_warmup(
-            optimizer, num_warmup_steps=args.warmup_steps
-        )
+        lr_scheduler = get_constant_schedule_with_warmup(optimizer, num_warmup_steps=args.warmup_steps)
 
     # load lr scheduler checkpoint
     if args.resume_from_checkpoint is not None:
@@ -456,6 +436,7 @@ def main():
     # Start training!
     ddp_model.train()
 
+    epoch = resume_from_epoch - 1
     for epoch in range(resume_from_epoch, args.num_epochs):
         laion_dataset.set_epoch(epoch)
         laion_loader = laion_dataset.dataloader

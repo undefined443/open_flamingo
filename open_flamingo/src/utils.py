@@ -31,18 +31,12 @@ def setattr_recursive(obj, att, val):
     setattr(obj, att.split(".")[-1], val)
 
 
-def apply_with_stopping_condition(
-    module, apply_fn, apply_condition=None, stopping_condition=None, **other_args
-):
+def apply_with_stopping_condition(module, apply_fn, apply_condition=None, stopping_condition=None, **other_args):
     if stopping_condition(module):
         return
     if apply_condition(module):
         apply_fn(module, **other_args)
     for child in module.children():
         apply_with_stopping_condition(
-            child,
-            apply_fn,
-            apply_condition=apply_condition,
-            stopping_condition=stopping_condition,
-            **other_args
+            child, apply_fn, apply_condition=apply_condition, stopping_condition=stopping_condition, **other_args
         )

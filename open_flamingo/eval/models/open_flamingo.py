@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List
 
 from PIL import Image
 import torch
@@ -28,13 +28,11 @@ class EvalModel(BaseEvalModel):
             and "cross_attn_every_n_layers" in model_args
             and "vision_encoder_pretrained" in model_args
             and "precision" in model_args
-        ), "OpenFlamingo requires vision_encoder_path, lm_path, device, checkpoint_path, lm_tokenizer_path, cross_attn_every_n_layers, vision_encoder_pretrained, and precision arguments to be specified"
-
-        self.device = (
-            model_args["device"]
-            if ("device" in model_args and model_args["device"] >= 0)
-            else "cpu"
+        ), (
+            "OpenFlamingo requires vision_encoder_path, lm_path, device, checkpoint_path, lm_tokenizer_path, cross_attn_every_n_layers, vision_encoder_pretrained, and precision arguments to be specified"
         )
+
+        self.device = model_args["device"] if ("device" in model_args and model_args["device"] >= 0) else "cpu"
 
         (
             self.model,
@@ -84,9 +82,7 @@ class EvalModel(BaseEvalModel):
                     )
                 batch_images[iexample, iimage, 0] = preprocessed
         if batch_images is not None:
-            batch_images = batch_images.to(
-                self.device, dtype=self.cast_dtype, non_blocking=True
-            )
+            batch_images = batch_images.to(self.device, dtype=self.cast_dtype, non_blocking=True)
         return batch_images
 
     def _prepare_text(
@@ -115,9 +111,7 @@ class EvalModel(BaseEvalModel):
         )
         input_ids, attention_mask = encodings["input_ids"], encodings["attention_mask"]
         input_ids = input_ids.to(self.device, dtype=self.cast_dtype, non_blocking=True)
-        attention_mask = attention_mask.to(
-            self.device, dtype=self.cast_dtype, non_blocking=True
-        )
+        attention_mask = attention_mask.to(self.device, dtype=self.cast_dtype, non_blocking=True)
         return input_ids, attention_mask.bool()
 
     def get_outputs(
@@ -192,13 +186,11 @@ class EvalModel(BaseEvalModel):
         overall_probs = []
         for class_name in all_class_names:
             # Tokenize only the class name
-            classname_tokens = self.tokenizer(
-                class_name, add_special_tokens=False, return_tensors="pt"
-            )["input_ids"].to(self.device)
+            classname_tokens = self.tokenizer(class_name, add_special_tokens=False, return_tensors="pt")[
+                "input_ids"
+            ].to(self.device)
             assert classname_tokens.ndim == 2
-            classname_tokens = repeat(
-                classname_tokens, "b s -> (repeat b) s", repeat=len(batch_text)
-            )
+            classname_tokens = repeat(classname_tokens, "b s -> (repeat b) s", repeat=len(batch_text))
             num_tokens_in_classname = classname_tokens.shape[1]
 
             # Concatenate the class name tokens
@@ -235,12 +227,8 @@ class EvalModel(BaseEvalModel):
                 logits = torch.cat([precomputed_logits, logits], dim=1)
 
             logprobs = torch.log_softmax(logits, dim=-1)
-            gen_probs = logprobs[
-                :, -num_tokens_in_classname - 1 : -1, :
-            ]  # (B, num_tokens_in_classname, vocab_len)
-            gen_probs = torch.gather(
-                gen_probs, 2, classname_tokens[:, :, None]
-            ).squeeze(-1)
+            gen_probs = logprobs[:, -num_tokens_in_classname - 1 : -1, :]  # (B, num_tokens_in_classname, vocab_len)
+            gen_probs = torch.gather(gen_probs, 2, classname_tokens[:, :, None]).squeeze(-1)
 
             # Aggregate over tokens in the classname
             if normalize_length:
@@ -325,7 +313,9 @@ class EvalModel(BaseEvalModel):
         return f"<image>Question:{question} Short answer:{answer if answer is not None else ''}{'<|endofchunk|>' if answer is not None else ''}"
 
     def get_caption_prompt(self, caption=None) -> str:
-        return f"<image>Output:{caption if caption is not None else ''}{'<|endofchunk|>' if caption is not None else ''}"
+        return (
+            f"<image>Output:{caption if caption is not None else ''}{'<|endofchunk|>' if caption is not None else ''}"
+        )
 
     def get_imagenet_prompt(self, label=None) -> str:
         return f"<image>Output:{label if label is not None else ''}{'<|endofchunk|>' if label is not None else ''}"

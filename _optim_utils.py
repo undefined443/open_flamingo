@@ -130,9 +130,7 @@ def _unflatten_optim_state(
         state dict will need to map these entries using the proper unflattened
         parameter IDs.
     """
-    assert (
-        not shard_state or to_save
-    ), "If ``shard_state`` is True, ``to_save`` has to be True."
+    assert not shard_state or to_save, "If ``shard_state`` is True, ``to_save`` has to be True."
     consolidated_state = _communicate_optim_state(
         fsdp_param_info,
         flat_param_state,
@@ -194,10 +192,7 @@ def _communicate_optim_state(
             # If the parameter is not sharded, then neither is the
             # positive-dimension tensor state, so no need to communicate it --
             # we take the target rank's value
-            if (
-                fsdp_state.world_size == 1
-                or fsdp_state.sharding_strategy == ShardingStrategy.NO_SHARD
-            ):
+            if fsdp_state.world_size == 1 or fsdp_state.sharding_strategy == ShardingStrategy.NO_SHARD:
                 tensor_state[state_name] = value
                 continue
             if not value.is_cuda:
@@ -206,13 +201,9 @@ def _communicate_optim_state(
             # has the same shape as the sharded flattened parameter
             buffer_size = flat_param._full_param_padded.size()  # type: ignore[attr-defined]
             tensor_buffer = value.new_zeros(*buffer_size)
-            dist.all_gather_into_tensor(
-                tensor_buffer, value, group=fsdp_state.process_group
-            )
+            dist.all_gather_into_tensor(tensor_buffer, value, group=fsdp_state.process_group)
             torch.cuda.synchronize()
-            unpadded_numel = cast(
-                nn.Parameter, flat_param._unpadded_unsharded_size
-            ).numel()
+            unpadded_numel = cast(nn.Parameter, flat_param._unpadded_unsharded_size).numel()
             tensor_state[state_name] = tensor_buffer[:unpadded_numel]
         # Zero-dimension tensor state and non-tensor state: take this rank's
         # value directly
@@ -325,8 +316,7 @@ def _flatten_optim_state_dict(
     unflat_osd = optim_state_dict
     if "state" not in unflat_osd or "param_groups" not in unflat_osd:
         raise ValueError(
-            '`optim_state_dict` must have the keys "state" and '
-            '"param_groups" to be a valid optimizer state dict'
+            '`optim_state_dict` must have the keys "state" and "param_groups" to be a valid optimizer state dict'
         )
     param_to_fqns = _get_param_to_fqns(model)
     fqn_to_fsdp_param_info = _get_fqn_to_fsdp_param_info(model)
@@ -354,9 +344,7 @@ def _flatten_optim_state_dict(
         if fqn in fqn_to_fsdp_param_info:
             fsdp_param_info = fqn_to_fsdp_param_info[fqn]
             if use_orig_params:
-                assert (
-                    shard_state
-                ), "If use_orig_params is True, shard_state must be True."
+                assert shard_state, "If use_orig_params is True, shard_state must be True."
                 flat_state = _shard_orig_param_state(
                     fsdp_param_info,
                     fqn,
@@ -379,9 +367,7 @@ def _flatten_optim_state_dict(
                 assert len(unflat_param_names) == 1
                 local_wrapped_fqn = local_state_clean_fqns.get(fqn, "")
                 if local_wrapped_fqn:
-                    flat_osd_state[key] = copy.deepcopy(
-                        local_state_dict[local_wrapped_fqn]
-                    )
+                    flat_osd_state[key] = copy.deepcopy(local_state_dict[local_wrapped_fqn])
         else:  # do not flatten non-FSDP parameters' states
             assert len(unflat_param_names) == 1
             key = _OptimStateKey(tuple(unflat_param_names), False)
@@ -428,21 +414,15 @@ def _flatten_optim_state(
     fsdp_state = fsdp_param_info.state
     flat_param = fsdp_param_info.flat_param
     num_unflat_params = len(unflat_param_names)
-    assert num_unflat_params > 0, (
-        "Expects at least one unflattened parameter corresponding to the "
-        "flattened parameter"
-    )
+    assert num_unflat_params > 0, "Expects at least one unflattened parameter corresponding to the flattened parameter"
     unflat_param_shapes = flat_param._shapes
     num_unflat_param_shapes = len(unflat_param_shapes)
-    assert (
-        num_unflat_params == num_unflat_param_shapes
-    ), f"Expects {num_unflat_params} shapes but got {num_unflat_param_shapes}"
+    assert num_unflat_params == num_unflat_param_shapes, (
+        f"Expects {num_unflat_params} shapes but got {num_unflat_param_shapes}"
+    )
 
     # Check if these unflattened parameters have any optimizer state
-    has_state = [
-        bool(unflat_param_name in unflat_osd_state)
-        for unflat_param_name in unflat_param_names
-    ]
+    has_state = [bool(unflat_param_name in unflat_osd_state) for unflat_param_name in unflat_param_names]
     # If none of the unflattened parameters comprising this flattened parameter
     # have any state, then we do not want an entry in the optimizer state dict
     if not any(has_state):
@@ -450,9 +430,7 @@ def _flatten_optim_state(
     # There may still be some unflattened parameters with state and some
     # without
     unflat_param_states = [
-        _gather_state_dict(
-            unflat_osd_state[unflat_param_name], pg=fsdp_state.process_group
-        )
+        _gather_state_dict(unflat_osd_state[unflat_param_name], pg=fsdp_state.process_group)
         if unflat_param_name in unflat_osd_state
         else None
         for unflat_param_name in unflat_param_names
@@ -467,8 +445,7 @@ def _flatten_optim_state(
         else:
             if state_names != set(unflat_param_state.keys()):
                 raise ValueError(
-                    "Differing optimizer state names for the unflattened "
-                    f"parameters: {unflat_param_names}"
+                    f"Differing optimizer state names for the unflattened parameters: {unflat_param_names}"
                 )
     assert state_names is not None
 
@@ -486,9 +463,7 @@ def _flatten_optim_state(
             are_zero_dim_tensors &= _is_zero_dim_tensor(v)
             are_non_tensors &= not torch.is_tensor(v)
         types = {type(v) for v in non_none_state_values}
-        if len(types) != 1 or not (
-            are_pos_dim_tensors or are_zero_dim_tensors or are_non_tensors
-        ):
+        if len(types) != 1 or not (are_pos_dim_tensors or are_zero_dim_tensors or are_non_tensors):
             raise ValueError(
                 f"Differing optimizer state types for state {state_name}, "
                 f"values {non_none_state_values}, and unflattened parameter "
@@ -585,8 +560,7 @@ def _flatten_tensor_optim_state(
             raise ValueError("Flattening a zero-dimension parameter is not supported")
         elif tensor is not None and tensor.shape != shape:
             raise ValueError(
-                "Tensor optimizer state does not have same shape as its "
-                f"parameter: {tensor.shape} {shape}"
+                f"Tensor optimizer state does not have same shape as its parameter: {tensor.shape} {shape}"
             )
     # Flatten the tensor states: we do not need to add any padding since the
     # flattened optimizer state tensor sharded via `_get_shard()`, which pads
@@ -607,8 +581,7 @@ def _flatten_tensor_optim_state(
     flat_tensor = torch.cat(tensors)
     flat_param_shape = flat_param._unpadded_unsharded_size  # type: ignore[attr-defined]
     assert flat_tensor.shape == flat_param_shape, (
-        f"tensor optim state: {flat_tensor.shape} "
-        f"flattened parameter: {flat_param_shape}"
+        f"tensor optim state: {flat_tensor.shape} flattened parameter: {flat_param_shape}"
     )
     return flat_tensor
 
@@ -650,11 +623,7 @@ def _flatten_zero_dim_tensor_optim_state(
     # Enforce that all have the same value and dtype
     values_set = {t.item() if t is not None else None for t in zero_dim_tensors}
     dtypes = {t.dtype if t is not None else None for t in zero_dim_tensors}
-    if (
-        len(non_none_tensors) != len(zero_dim_tensors)
-        or len(values_set) != 1
-        or len(dtypes) != 1
-    ):
+    if len(non_none_tensors) != len(zero_dim_tensors) or len(values_set) != 1 or len(dtypes) != 1:
         raise ValueError(
             "All unflattened parameters comprising a single flattened "
             "parameter must have scalar state with the same value and dtype "
@@ -734,9 +703,7 @@ def _process_pos_dim_tensor_state(
                 no_tensor_osd["state"][key][state_name] = value
                 continue
             if key.is_fsdp_managed:  # FSDP parameter
-                sharded_size = FlatParamHandle._get_sharded_size(
-                    value, rank=0, world_size=world_size
-                )
+                sharded_size = FlatParamHandle._get_sharded_size(value, rank=0, world_size=world_size)
                 assert len(sharded_size) == 1, f"{sharded_size}"
                 info = _PosDimTensorInfo(sharded_size, value.dtype)
             else:  # non-FSDP parameter
@@ -800,9 +767,9 @@ def _broadcast_pos_dim_tensor_states(
         Dict[str, Any]: The optimizer state dict with the positive-dimension
         tensor state correctly populated via ``broadcast()`` s from rank 0.
     """
-    assert (
-        rank != 0 or flat_optim_state_dict is not None
-    ), "Expects rank 0 to pass in the flattened optimizer state dict"
+    assert rank != 0 or flat_optim_state_dict is not None, (
+        "Expects rank 0 to pass in the flattened optimizer state dict"
+    )
     no_tensor_osd = processed_optim_state_dict  # alias
     flat_osd = flat_optim_state_dict  # alias
     for key, param_state in no_tensor_osd["state"].items():
@@ -865,9 +832,7 @@ def _broadcast_sharded_pos_dim_tensor_state(
     """
     get_shard: Optional[functools.partial[Tuple[torch.Tensor, int]]] = None
     if rank == 0:
-        assert (
-            unsharded_tensor is not None
-        ), "Expects rank 0 to pass in the unsharded tensor"
+        assert unsharded_tensor is not None, "Expects rank 0 to pass in the unsharded tensor"
         get_shard = functools.partial(
             FlatParamHandle._get_shard,
             unsharded_tensor,
@@ -916,15 +881,9 @@ def _broadcast_unsharded_pos_dim_tensor_state(
             broadcast if on rank 0; ignored otherwise.
     """
     if rank == 0:
-        assert (
-            unsharded_tensor is not None
-        ), "Expects rank 0 to pass in the unsharded tensor"
-        assert (
-            shape == unsharded_tensor.shape
-        ), f"Shape mismatch: {shape} {unsharded_tensor.shape}"
-        assert (
-            dtype == unsharded_tensor.dtype
-        ), f"dtype mismatch: {dtype} {unsharded_tensor.dtype}"
+        assert unsharded_tensor is not None, "Expects rank 0 to pass in the unsharded tensor"
+        assert shape == unsharded_tensor.shape, f"Shape mismatch: {shape} {unsharded_tensor.shape}"
+        assert dtype == unsharded_tensor.dtype, f"dtype mismatch: {dtype} {unsharded_tensor.dtype}"
         unsharded_tensor = unsharded_tensor.to(broadcast_device)
     else:
         unsharded_tensor = torch.zeros(
@@ -964,9 +923,7 @@ def _rekey_sharded_optim_state_dict(
         (
             _get_param_to_param_id_from_optim_input(model, optim_input)
             if using_optim_input
-            else _get_param_to_param_key(
-                optim, model, is_named_optimizer, param_to_fqns, flat_param_to_fqn
-            )
+            else _get_param_to_param_key(optim, model, is_named_optimizer, param_to_fqns, flat_param_to_fqn)
         ),
     )
     # All parameter keys in `param_to_param_key` should be in
@@ -974,12 +931,8 @@ def _rekey_sharded_optim_state_dict(
     # passed to the optimizer
     assert len(param_to_param_key) <= len(param_to_fqns)
 
-    unflat_param_names_to_flat_param_key: Dict[
-        Tuple[str, ...], Union[int, str]
-    ] = {}  # for "state"
-    unflat_param_name_to_flat_param_key: Dict[
-        str, Union[int, str]
-    ] = {}  # for "param_groups"
+    unflat_param_names_to_flat_param_key: Dict[Tuple[str, ...], Union[int, str]] = {}  # for "state"
+    unflat_param_name_to_flat_param_key: Dict[str, Union[int, str]] = {}  # for "param_groups"
     for param, unflat_param_names in param_to_fqns.items():
         if param not in param_to_param_key:
             # This parameter was not passed to the optimizer
@@ -995,9 +948,7 @@ def _rekey_sharded_optim_state_dict(
         if isinstance(key, str):
             rekeyed_osd_state[key] = param_state
             continue
-        flat_param_key = unflat_param_names_to_flat_param_key.get(
-            key.unflat_param_names, key.unflat_param_names
-        )
+        flat_param_key = unflat_param_names_to_flat_param_key.get(key.unflat_param_names, key.unflat_param_names)
         rekeyed_osd_state[flat_param_key] = param_state
 
     rekeyed_osd_param_groups: List[Dict[str, Any]] = []
@@ -1059,10 +1010,7 @@ def _get_param_id_to_param_from_optim_input(
     try:
         params = cast(List[nn.Parameter], list(optim_input))
     except TypeError as e:
-        raise TypeError(
-            "Optimizer input should be an iterable of Tensors or dicts, "
-            f"but got {optim_input}"
-        ) from e
+        raise TypeError(f"Optimizer input should be an iterable of Tensors or dicts, but got {optim_input}") from e
     if len(params) == 0:
         raise ValueError("Optimizer input should not be empty")
 
@@ -1080,10 +1028,7 @@ def _get_param_id_to_param_from_optim_input(
     param_id_to_param: List[nn.Parameter] = []
     for param_group in params:
         has_params_key = "params" in param_group  # type: ignore[operator]
-        assert has_params_key, (
-            'A parameter group should map "params" to a list of the '
-            "parameters in the group"
-        )
+        assert has_params_key, 'A parameter group should map "params" to a list of the parameters in the group'
         for param in param_group["params"]:  # type: ignore[index]
             # Implicitly map `flat_param_id` (current length of the list) to
             # `param`
@@ -1127,9 +1072,9 @@ def _get_param_key_to_param(
     """
     clean_fqn_to_curr_fqn: Dict[str, str] = {}
     if is_named_optimizer:
-        assert (
-            param_to_fqns is not None and flat_param_to_fqn is not None
-        ), "The optimizer is a NamedOptimizer, `param_to_fqns` must not be None."
+        assert param_to_fqns is not None and flat_param_to_fqn is not None, (
+            "The optimizer is a NamedOptimizer, `param_to_fqns` must not be None."
+        )
         assert model is not None
         for key, _ in model.named_parameters():
             clean_fqn_to_curr_fqn[clean_tensor_name(key)] = key
@@ -1170,9 +1115,7 @@ def _get_param_to_param_key(
     only supports the case where `optim` is a regular optimizer, not NamedOptimizer.
     So the parameter keys will be parameter id.
     """
-    param_id_to_param = _get_param_key_to_param(
-        optim, model, is_named_optimizer, param_to_fqns, flat_param_to_fqn
-    )
+    param_id_to_param = _get_param_key_to_param(optim, model, is_named_optimizer, param_to_fqns, flat_param_to_fqn)
     return {param: param_id for param_id, param in param_id_to_param.items()}
 
 
@@ -1207,9 +1150,7 @@ def _check_missing_keys_on_rank(
             continue
         param_key = optim_state_key_to_param_key[r0_optim_state_key]
         if isinstance(param_key, int):
-            assert param_key >= 0 and param_key < len(
-                param_key_to_param
-            ), "Check the `param_key_to_param` construction"
+            assert param_key >= 0 and param_key < len(param_key_to_param), "Check the `param_key_to_param` construction"
     device = torch.device("cuda", torch.cuda.current_device())
     num_missing = torch.tensor([len(missing_keys)], dtype=torch.int32, device=device)
     dist.all_reduce(num_missing, group=group)
@@ -1225,8 +1166,7 @@ def _check_missing_keys_on_rank(
             keys = cast(List[_OptimStateKey], keys)
             if len(keys) > 0:
                 error_msg += (
-                    f"\nRank {rank} is missing states for the parameters: "
-                    f"{[key.unflat_param_names for key in keys]}"
+                    f"\nRank {rank} is missing states for the parameters: {[key.unflat_param_names for key in keys]}"
                 )
         raise RuntimeError(error_msg)
 
@@ -1271,18 +1211,12 @@ def _map_param_key_to_optim_keys(
         optim_state_key_to_param_key[optim_state_key] = param_key
 
     if merge_keys:
-        all_keys: List[List[_OptimStateKey]] = [
-            [] for _ in range(dist.get_world_size(group))
-        ]
+        all_keys: List[List[_OptimStateKey]] = [[] for _ in range(dist.get_world_size(group))]
         dist.all_gather_object(all_keys, all_optim_state_keys, group=group)
-        merge_all_optim_state_keys = [
-            key for local_keys in all_keys for key in local_keys
-        ]
+        merge_all_optim_state_keys = [key for local_keys in all_keys for key in local_keys]
         all_optim_state_keys = sorted(set(merge_all_optim_state_keys))
     else:
-        key_obj_list: List[Optional[List[_OptimStateKey]]] = (
-            [all_optim_state_keys] if rank == 0 else [None]
-        )
+        key_obj_list: List[Optional[List[_OptimStateKey]]] = [all_optim_state_keys] if rank == 0 else [None]
         dist.broadcast_object_list(key_obj_list, src=0, group=group)
         assert key_obj_list[0] is not None
         all_optim_state_keys = key_obj_list[0]
@@ -1304,13 +1238,8 @@ def _unflatten_param_groups(
     param_groups: List[Dict[str, Any]] = []
     for flat_param_group in state_dict["param_groups"]:
         unflat_param_group = copy.deepcopy(flat_param_group)
-        param_group_params = [
-            param_key_to_param[flat_param_key]
-            for flat_param_key in flat_param_group["params"]
-        ]
-        nested_unflat_param_names = [
-            param_to_fqns[param] for param in param_group_params
-        ]
+        param_group_params = [param_key_to_param[flat_param_key] for flat_param_key in flat_param_group["params"]]
+        nested_unflat_param_names = [param_to_fqns[param] for param in param_group_params]
         unflat_param_group["params"] = [
             unflat_param_name
             for unflat_param_names in nested_unflat_param_names
@@ -1410,9 +1339,7 @@ def _optim_state_dict(
         (
             _get_param_id_to_param_from_optim_input(model, optim_input)
             if using_optim_input
-            else _get_param_key_to_param(
-                optim, model, is_named_optimizer, param_to_fqns, flat_param_to_fqn
-            )
+            else _get_param_key_to_param(optim, model, is_named_optimizer, param_to_fqns, flat_param_to_fqn)
         ),
     )
     fqn_to_fsdp_param_info = _get_fqn_to_fsdp_param_info(model)
@@ -1429,9 +1356,7 @@ def _optim_state_dict(
     # Iterate in rank 0's flattened parameter ID order to ensure aligned
     # all-gathers across ranks
     for optim_state_key in all_optim_state_keys:
-        param_key: Union[str, int, None] = optim_state_key_to_param_key.get(
-            optim_state_key, None
-        )
+        param_key: Union[str, int, None] = optim_state_key_to_param_key.get(optim_state_key, None)
 
         if param_key is None:
             assert use_orig_params, (
@@ -1448,14 +1373,8 @@ def _optim_state_dict(
             fqn = optim_state_key.unflat_param_names[0]
             fsdp_param_info = fqn_to_fsdp_param_info[fqn]
             if use_orig_params:
-                state = (
-                    {} if param_key is None else optim_state_dict["state"][param_key]
-                )
-                unflat_state = [
-                    _gather_orig_param_state(
-                        fsdp_param_info, fqn, state, shard_state, group
-                    )
-                ]
+                state = {} if param_key is None else optim_state_dict["state"][param_key]
+                unflat_state = [_gather_orig_param_state(fsdp_param_info, fqn, state, shard_state, group)]
             else:
                 unflat_state = _unflatten_optim_state(
                     fsdp_param_info,
@@ -1473,9 +1392,7 @@ def _optim_state_dict(
         elif to_save:
             assert len(optim_state_key.unflat_param_names) == 1
             unflat_param_name = optim_state_key.unflat_param_names[0]
-            fsdp_osd_state[unflat_param_name] = copy.copy(
-                optim_state_dict["state"][param_key]
-            )
+            fsdp_osd_state[unflat_param_name] = copy.copy(optim_state_dict["state"][param_key])
             for state_name, value in sorted_items(fsdp_osd_state[unflat_param_name]):
                 if torch.is_tensor(value):
                     fsdp_osd_state[unflat_param_name][state_name] = value.cpu()
@@ -1502,9 +1419,7 @@ def _optim_state_dict(
             )
             fsdp_osd_state[key] = value
 
-        fsdp_osd["param_groups"] = _unflatten_param_groups(
-            optim_state_dict, param_key_to_param, param_to_fqns
-        )
+        fsdp_osd["param_groups"] = _unflatten_param_groups(optim_state_dict, param_key_to_param, param_to_fqns)
 
     return fsdp_osd
 
@@ -1583,22 +1498,16 @@ def _all_gather_optim_state(
                 # Ensure that `step` is on CPU.
                 processed_state.scalar_tensors[state_name] = value.cpu()
             else:
-                processed_state.tensors[state_name] = _PosDimTensorInfo(
-                    value.shape, value.dtype
-                )
+                processed_state.tensors[state_name] = _PosDimTensorInfo(value.shape, value.dtype)
         else:
             processed_state.non_tensors = value
-    object_list: List[StateInfo] = [
-        processed_state for _ in range(fsdp_state.world_size)
-    ]
+    object_list: List[StateInfo] = [processed_state for _ in range(fsdp_state.world_size)]
     dist.all_gather_object(object_list, processed_state, group=group)
 
     # Convert the gathered, pre-proccessed state of each rank to the original one.
     gathered_state: Dict[str, Any] = {}
 
-    all_tensor_states = sorted(
-        {n for state in object_list for n in state.tensors.keys()}
-    )
+    all_tensor_states = sorted({n for state in object_list for n in state.tensors.keys()})
     empty_ranks: Set[int] = set()
     for name in all_tensor_states:
         numels = []
@@ -1613,21 +1522,14 @@ def _all_gather_optim_state(
             if numels[-1] == 0:
                 _empty_ranks.add(rank)
 
-        empty_func = functools.partial(
-            torch.empty, dtype=dtype, device=fsdp_state.compute_device
-        )
+        empty_func = functools.partial(torch.empty, dtype=dtype, device=fsdp_state.compute_device)
         if empty_ranks:
             assert empty_ranks == _empty_ranks
         empty_ranks = _empty_ranks
         local_state = optim_state.get(name, empty_func(0))
         local_state = local_state.to(fsdp_state.compute_device)
-        tensors = [
-            empty_func(numel) if rank != fsdp_state.rank else local_state
-            for rank, numel in enumerate(numels)
-        ]
-        work = dist.all_gather(
-            tensors, local_state, group=fsdp_state.process_group, async_op=True
-        )
+        tensors = [empty_func(numel) if rank != fsdp_state.rank else local_state for rank, numel in enumerate(numels)]
+        work = dist.all_gather(tensors, local_state, group=fsdp_state.process_group, async_op=True)
         gathered_state[name] = AllGatherInfo(tensors, numels, work)
 
     for rank, object_state in enumerate(object_list):
@@ -1635,17 +1537,16 @@ def _all_gather_optim_state(
             continue
         for name, non_tensor_value in object_state.non_tensors.items():
             curr_non_tensor_value = gathered_state.get(name, None)
-            assert (
-                curr_non_tensor_value is None
-                or curr_non_tensor_value == non_tensor_value
-            ), f"Different ranks have different values for {name}."
+            assert curr_non_tensor_value is None or curr_non_tensor_value == non_tensor_value, (
+                f"Different ranks have different values for {name}."
+            )
             gathered_state[name] = non_tensor_value
 
         for name, scalar_tensor_value in object_state.scalar_tensors.items():
             curr_scalar_tensor_value = gathered_state.get(name, None)
-            assert curr_scalar_tensor_value is None or torch.equal(
-                scalar_tensor_value, curr_scalar_tensor_value
-            ), f"Different ranks have different values for {name}."
+            assert curr_scalar_tensor_value is None or torch.equal(scalar_tensor_value, curr_scalar_tensor_value), (
+                f"Different ranks have different values for {name}."
+            )
             gathered_state[name] = scalar_tensor_value
 
     for name, value in list(gathered_state.items()):
@@ -1654,11 +1555,7 @@ def _all_gather_optim_state(
         assert value.work is not None
         value.work.wait()
         gathered_state[name] = torch.cat(
-            [
-                rank_tensor[:rank_numel]
-                for rank_tensor, rank_numel in zip(value.tensors, value.numels)
-                if rank_numel > 0
-            ]
+            [rank_tensor[:rank_numel] for rank_tensor, rank_numel in zip(value.tensors, value.numels) if rank_numel > 0]
         )
 
     return gathered_state
@@ -1676,15 +1573,10 @@ def _gather_orig_param_state(
     This API should only be used when ``use_orig_params`` is True.
     """
     fsdp_state = fsdp_param_info.state
-    assert (
-        fsdp_state._use_orig_params
-    ), "_gather_orig_param_state only support use_orig_params=True case"
+    assert fsdp_state._use_orig_params, "_gather_orig_param_state only support use_orig_params=True case"
     flat_param = fsdp_param_info.flat_param
     param_idx = fsdp_param_info.param_indices[fqn]
-    if (
-        fsdp_state.world_size == 1
-        or fsdp_state.sharding_strategy == ShardingStrategy.NO_SHARD
-    ):
+    if fsdp_state.world_size == 1 or fsdp_state.sharding_strategy == ShardingStrategy.NO_SHARD:
         return optim_state
 
     gathered_state = _all_gather_optim_state(fsdp_state, optim_state, group=group)
@@ -1694,9 +1586,7 @@ def _gather_orig_param_state(
         if not torch.is_tensor(value) or value.dim() == 0:
             continue
 
-        value = value[: flat_param._numels[param_idx]].reshape(
-            flat_param._shapes[param_idx]
-        )
+        value = value[: flat_param._numels[param_idx]].reshape(flat_param._shapes[param_idx])
         if shard_state:
             assert fsdp_state.process_group is not None
             value = _ext_chunk_tensor(

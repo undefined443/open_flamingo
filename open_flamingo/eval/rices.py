@@ -1,7 +1,6 @@
 import open_clip
 import torch
 from tqdm import tqdm
-import torch
 from utils import custom_collate_fn
 
 
@@ -52,9 +51,7 @@ class RICES:
                 desc="Precomputing features for RICES",
             ):
                 batch = batch["image"]
-                inputs = torch.stack(
-                    [self.image_processor(image) for image in batch]
-                ).to(self.device)
+                inputs = torch.stack([self.image_processor(image) for image in batch]).to(self.device)
                 image_features = self.model.encode_image(inputs)
                 image_features /= image_features.norm(dim=-1, keepdim=True)
                 features.append(image_features.detach())
@@ -70,9 +67,7 @@ class RICES:
         self.model.eval()
 
         with torch.no_grad():
-            inputs = torch.stack([self.image_processor(image) for image in batch]).to(
-                self.device
-            )
+            inputs = torch.stack([self.image_processor(image) for image in batch]).to(self.device)
 
             # Get the feature of the input image
             query_feature = self.model.encode_image(inputs)

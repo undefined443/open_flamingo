@@ -1,5 +1,4 @@
 import abc
-import argparse
 from typing import List
 from torch.nn.parallel import DistributedDataParallel as DDP
 from PIL import Image

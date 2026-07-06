@@ -39,20 +39,12 @@ class CaptionDataset(Dataset):
     def __getitem__(self, idx):
         if self.dataset_name == "coco":
             image = Image.open(
-                os.path.join(
-                    self.image_train_dir_path, self.annotations[idx]["filename"]
-                )
+                os.path.join(self.image_train_dir_path, self.annotations[idx]["filename"])
                 if self.annotations[idx]["filepath"] == "train2014"
-                else os.path.join(
-                    self.image_val_dir_path, self.annotations[idx]["filename"]
-                )
+                else os.path.join(self.image_val_dir_path, self.annotations[idx]["filename"])
             )
         elif self.dataset_name == "flickr":
-            image = Image.open(
-                os.path.join(
-                    self.image_train_dir_path, self.annotations[idx]["filename"]
-                )
-            )
+            image = Image.open(os.path.join(self.image_train_dir_path, self.annotations[idx]["filename"]))
         image.load()
         caption = self.annotations[idx]["sentences"][0]["raw"]
         return {
@@ -65,9 +57,7 @@ class CaptionDataset(Dataset):
 
 
 class VQADataset(Dataset):
-    def __init__(
-        self, image_dir_path, question_path, annotations_path, is_train, dataset_name
-    ):
+    def __init__(self, image_dir_path, question_path, annotations_path, is_train, dataset_name):
         self.questions = json.load(open(question_path, "r"))["questions"]
         if annotations_path is not None:
             self.answers = json.load(open(annotations_path, "r"))["annotations"]
@@ -119,9 +109,7 @@ class ImageNetDataset(ImageFolder):
 
     def __init__(self, root, **kwargs):
         super().__init__(root=root, **kwargs)
-        self.class_id_to_name = dict(
-            zip(range(len(IMAGENET_CLASSNAMES)), IMAGENET_CLASSNAMES)
-        )
+        self.class_id_to_name = dict(zip(range(len(IMAGENET_CLASSNAMES)), IMAGENET_CLASSNAMES))
 
     def __getitem__(self, idx):
         sample, target = super().__getitem__(idx)

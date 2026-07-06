@@ -56,21 +56,15 @@ def main():
                         for img_idx, image_name in enumerate(image_names):
                             try:
                                 # load image
-                                img = Image.open(
-                                    os.path.join(args.image_dir, str(idx), image_name)
-                                ).convert("RGB")
+                                img = Image.open(os.path.join(args.image_dir, str(idx), image_name)).convert("RGB")
                                 buffered = BytesIO()
                                 img.save(buffered, format="JPEG")
                                 img_str = base64.b64encode(buffered.getvalue())
 
                                 # convert to base64
-                                sample_data["image_info"][img_idx][
-                                    "image_base64"
-                                ] = img_str.decode("utf-8")
+                                sample_data["image_info"][img_idx]["image_base64"] = img_str.decode("utf-8")
                             except FileNotFoundError:
-                                print(
-                                    f"Did not find {image_name} downloaded. This can happen if the url is now 404."
-                                )
+                                print(f"Did not find {image_name} downloaded. This can happen if the url is now 404.")
                             except Exception as e:
                                 print(f"Error processing {image_name}: {e}")
 

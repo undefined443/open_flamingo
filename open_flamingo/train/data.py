@@ -16,7 +16,15 @@ from PIL import Image
 import base64
 from scipy.optimize import linear_sum_assignment
 
-from data_utils import *
+from data_utils import (
+    DataInfo,
+    ResampledShards2,
+    SharedEpoch,
+    detshuffle2,
+    get_dataset_size,
+    log_and_continue,
+    tarfile_to_samples_nothrow,
+)
 
 Image.MAX_IMAGE_PIXELS = 1000000000
 N_CHANNELS = 3
@@ -27,7 +35,7 @@ _SAMPLE_SHUFFLE_SIZE = 5000
 _SAMPLE_SHUFFLE_INITIAL = 1000
 
 try:
-    import horovod.torch as hvd
+    import horovod.torch as hvd  # pyright: ignore[reportMissingImports]
 except ImportError:
     hvd = None
 
@@ -48,9 +56,7 @@ def filter_no_caption_or_no_image(sample):
     """
     Filter out LAION samples with no caption or no image.
     """
-    return ("txt" in sample) and (
-        "png" in sample or "jpg" in sample or "jpeg" in sample
-    )
+    return ("txt" in sample) and ("png" in sample or "jpg" in sample or "jpeg" in sample)
 
 
 def preprocess_laion_text(sample, tokenizer, max_tokens=32):
@@ -59,9 +65,7 @@ def preprocess_laion_text(sample, tokenizer, max_tokens=32):
     Captions are truncated to 32 tokens by default.
     """
     tokenizer.padding_side = "right"
-    sample = [
-        (f"<image>{s.strip()}<|endofchunk|>{tokenizer.eos_token}") for s in sample
-    ]
+    sample = [(f"<image>{s.strip()}<|endofchunk|>{tokenizer.eos_token}") for s in sample]
     text = tokenizer(
         sample,
         max_length=max_tokens,
@@ -72,9 +76,7 @@ def preprocess_laion_text(sample, tokenizer, max_tokens=32):
     return text["input_ids"], text["attention_mask"]
 
 
-def preprocess_gpt_interleaved(
-    info, tokenizer, clip_processor, min_num_images, max_num_images, max_tokens=256
-):
+def preprocess_gpt_interleaved(info, tokenizer, clip_processor, min_num_images, max_num_images, max_tokens=256):
     """
     Preprocess a ChatGPT-generated image-text sequence.
     """
@@ -93,18 +95,14 @@ def preprocess_gpt_interleaved(
     keep_ixs = range(min(len(images_tensors), max_num_images))
     images_tensors = images_tensors[keep_ixs]
     if len(images_tensors) < max_num_images:
-        zero_padding = torch.zeros(
-            (max_num_images - len(images_tensors), 3, 224, 224), dtype=torch.float
-        )
+        zero_padding = torch.zeros((max_num_images - len(images_tensors), 3, 224, 224), dtype=torch.float)
         images_tensors = torch.cat((images_tensors, zero_padding), dim=0)
 
     # preprocess and tokenize text
     text = text.replace("<|endofchunk|>", "", 1)  # but remove first eoc
     # whitespace cleanup
     text = (
-        text.replace(" <|endofchunk|>", "<|endofchunk|>")
-        .replace("<image> ", "<image>")
-        .replace(" <image>", "<image>")
+        text.replace(" <|endofchunk|>", "<|endofchunk|>").replace("<image> ", "<image>").replace(" <image>", "<image>")
     )
 
     indices = [m.start() for m in re.finditer("<image>", text)]
@@ -125,9 +123,7 @@ def preprocess_gpt_interleaved(
     # reject sequences with too few images after truncation
     num_images = torch.count_nonzero(
         text_tensor["input_ids"]
-        == tokenizer.additional_special_tokens_ids[
-            tokenizer.additional_special_tokens.index("<image>")
-        ]
+        == tokenizer.additional_special_tokens_ids[tokenizer.additional_special_tokens.index("<image>")]
     )
     if num_images < min_num_images:
         raise ValueError(f"Fewer than {min_num_images} images in sample")
@@ -150,9 +146,7 @@ def preprocess_interleaved(
     """
     info = json.loads(sample[0])
     if "is_gpt" in info:
-        return preprocess_gpt_interleaved(
-            info, tokenizer, clip_processor, min_num_images, max_num_images, max_tokens
-        )
+        return preprocess_gpt_interleaved(info, tokenizer, clip_processor, min_num_images, max_num_images, max_tokens)
 
     sentences = info["text_list"]
     sim_matrix = info["similarity_matrix"]
@@ -222,9 +216,7 @@ def preprocess_interleaved(
     text = text.replace("<|endofchunk|>", "", 1)  # but remove first eoc
     # whitespace cleanup
     text = (
-        text.replace(" <|endofchunk|>", "<|endofchunk|>")
-        .replace("<image> ", "<image>")
-        .replace(" <image>", "<image>")
+        text.replace(" <|endofchunk|>", "<|endofchunk|>").replace("<image> ", "<image>").replace(" <image>", "<image>")
     )
     text = f"{text}<|endofchunk|>{tokenizer.eos_token}"
     tokenizer.padding_side = "right"
@@ -239,28 +231,20 @@ def preprocess_interleaved(
     # reject sequences with too few images (after truncation)
     num_images = torch.count_nonzero(
         text_tensor["input_ids"]
-        == tokenizer.additional_special_tokens_ids[
-            tokenizer.additional_special_tokens.index("<image>")
-        ]
+        == tokenizer.additional_special_tokens_ids[tokenizer.additional_special_tokens.index("<image>")]
     )
     if num_images < min_num_images:
         raise ValueError(f"Fewer than {min_num_images} images in sample")
-    elif (
-        num_images == 1 and random.random() <= 0.5
-    ):  # 50% chance of keeping single image samples
+    elif num_images == 1 and random.random() <= 0.5:  # 50% chance of keeping single image samples
         raise ValueError("Only one image in sample")
 
     # avoid the situation where there's one <image> token and it's at the end
     if (
         num_images == 1
         and text_tensor["input_ids"][:, -1]
-        == tokenizer.additional_special_tokens_ids[
-            tokenizer.additional_special_tokens.index("<image>")
-        ]
+        == tokenizer.additional_special_tokens_ids[tokenizer.additional_special_tokens.index("<image>")]
     ):
-        raise ValueError(
-            "Only one image at the end of sample, so labels will all be -100"
-        )
+        raise ValueError("Only one image at the end of sample, so labels will all be -100")
 
     return (
         images_tensors,
@@ -289,9 +273,7 @@ def get_mmc4_dataset(args, image_processor, tokenizer, epoch=0, floor=False):
     # create a shared epoch store to sync epoch to dataloader worker proc
     shared_epoch = SharedEpoch(epoch=epoch)
     if resampled:
-        pipeline = [
-            ResampledShards2(input_shards, deterministic=True, epoch=shared_epoch)
-        ]
+        pipeline = [ResampledShards2(input_shards, deterministic=True, epoch=shared_epoch)]
     else:
         pipeline = [wds.SimpleShardList(input_shards)]
 
@@ -340,9 +322,7 @@ def get_mmc4_dataset(args, image_processor, tokenizer, epoch=0, floor=False):
 
     dataset = wds.DataPipeline(*pipeline)
     if not resampled:
-        assert (
-            num_shards >= args.workers * args.world_size
-        ), "number of shards must be >= total workers"
+        assert num_shards >= args.workers * args.world_size, "number of shards must be >= total workers"
     # roll over and repeat a few samples to get same number of full batches on each node
     round_fn = math.floor if floor else math.ceil
     global_batch_size = args.batch_size_mmc4 * args.world_size
@@ -390,16 +370,12 @@ def get_laion_dataset(args, image_processor, tokenizer, epoch=0, floor=False):
     # create a shared epoch store to sync epoch to dataloader worker proc
     shared_epoch = SharedEpoch(epoch=epoch)
     if resampled:
-        pipeline = [
-            ResampledShards2(input_shards, deterministic=True, epoch=shared_epoch)
-        ]
+        pipeline = [ResampledShards2(input_shards, deterministic=True, epoch=shared_epoch)]
     else:
         pipeline = [wds.SimpleShardList(input_shards)]
 
     # create two preprocess functions that take in the passed in image_processor and tokenizer
-    preprocess_image_fn = functools.partial(
-        preprocess_image, image_processor=image_processor
-    )
+    preprocess_image_fn = functools.partial(preprocess_image, image_processor=image_processor)
     preprocess_text_fn = functools.partial(preprocess_laion_text, tokenizer=tokenizer)
 
     # at this point we have an iterator over all the shards
@@ -434,17 +410,13 @@ def get_laion_dataset(args, image_processor, tokenizer, epoch=0, floor=False):
             wds.decode("pilrgb", handler=log_and_continue),
             wds.to_tuple("jpg;png;jpeg", "txt", handler=log_and_continue),
             wds.batched(args.batch_size_laion, partial=False),
-            wds.map_tuple(
-                preprocess_image_fn, preprocess_text_fn, handler=log_and_continue
-            ),
+            wds.map_tuple(preprocess_image_fn, preprocess_text_fn, handler=log_and_continue),
         ]
     )
 
     dataset = wds.DataPipeline(*pipeline)
     if not resampled:
-        assert (
-            num_shards >= args.workers * args.world_size
-        ), "number of shards must be >= total workers"
+        assert num_shards >= args.workers * args.world_size, "number of shards must be >= total workers"
     # roll over and repeat a few samples to get same number of full batches on each node
     round_fn = math.floor if floor else math.ceil
     global_batch_size = args.batch_size_laion * args.world_size
@@ -487,6 +459,4 @@ def get_data(args, image_processor, tokenizer, dataset_type, epoch=0):
     """
     Interface for getting the webdatasets
     """
-    return get_dataset_fn(dataset_type)(
-        args, image_processor=image_processor, epoch=epoch, tokenizer=tokenizer
-    )
+    return get_dataset_fn(dataset_type)(args, image_processor=image_processor, epoch=epoch, tokenizer=tokenizer)

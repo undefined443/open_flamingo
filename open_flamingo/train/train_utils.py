@@ -33,12 +33,10 @@ def get_mp_policy_dtype(precision: str):
 
 def get_autocast(precision, cache_enabled=True):
     if precision == "amp":
-        return torch.cuda.amp.autocast(cache_enabled=cache_enabled)
+        return lambda: torch.cuda.amp.autocast(cache_enabled=cache_enabled)
     elif precision == "amp_bfloat16" or precision == "amp_bf16":
         # amp_bfloat16 is more stable than amp float16 for clip training
-        return lambda: torch.cuda.amp.autocast(
-            dtype=torch.bfloat16, cache_enabled=cache_enabled
-        )
+        return lambda: torch.cuda.amp.autocast(dtype=torch.bfloat16, cache_enabled=cache_enabled)
     else:
         return suppress
 
@@ -58,22 +56,18 @@ def train_one_epoch(
     # setup loaders
     num_batches_per_epoch_laion = laion_loader.num_batches
     num_batches_per_epoch_mmc4 = mmc4_loader.num_batches
-    assert (
-        num_batches_per_epoch_laion == num_batches_per_epoch_mmc4
-    ), "Number of batches in laion and mmc4 datasets must be the same"
+    assert num_batches_per_epoch_laion == num_batches_per_epoch_mmc4, (
+        "Number of batches in laion and mmc4 datasets must be the same"
+    )
     num_batches_per_epoch = num_batches_per_epoch_mmc4
     total_training_steps = num_batches_per_epoch * args.num_epochs
 
-    autocast = get_autocast(
-        args.precision, cache_enabled=(not args.fsdp)
-    )  # if fsdp, disable cache to save memory
+    autocast = get_autocast(args.precision, cache_enabled=(not args.fsdp))  # if fsdp, disable cache to save memory
     cast_dtype = get_cast_dtype(args.precision)
 
     # setup model
     media_token_id = tokenizer("<image>", add_special_tokens=False)["input_ids"][-1]
-    endofchunk_token_id = tokenizer("<|endofchunk|>", add_special_tokens=False)[
-        "input_ids"
-    ][-1]
+    endofchunk_token_id = tokenizer("<|endofchunk|>", add_special_tokens=False)["input_ids"][-1]
     model.train()
 
     # setup logging
@@ -95,9 +89,7 @@ def train_one_epoch(
         images = batch_laion[0].to(device_id, dtype=cast_dtype, non_blocking=True)
         images = rearrange(images, "(b t f) c h w -> b t f c h w", t=1, f=1)
         input_ids = batch_laion[1][0].to(device_id, dtype=cast_dtype, non_blocking=True)
-        attention_mask = batch_laion[1][1].to(
-            device_id, dtype=cast_dtype, non_blocking=True
-        )
+        attention_mask = batch_laion[1][1].to(device_id, dtype=cast_dtype, non_blocking=True)
 
         # set up labels; language model is expected to handle shifting
         labels = input_ids.clone()
@@ -129,9 +121,7 @@ def train_one_epoch(
         for i in range(labels.shape[0]):
             # remove loss for any token before the first <image> token
             label_idx = 0
-            while (
-                label_idx < labels.shape[1] and labels[i][label_idx] != media_token_id
-            ):
+            while label_idx < labels.shape[1] and labels[i][label_idx] != media_token_id:
                 labels[i][label_idx] = -100
                 label_idx += 1
 
@@ -139,10 +129,7 @@ def train_one_epoch(
             endofchunk_idxs = torch.where(labels[i] == endofchunk_token_id)[0]
             for endofchunk_idx in endofchunk_idxs:
                 token_idx = endofchunk_idx + 1
-                while (
-                    token_idx < labels.shape[1]
-                    and labels[i][token_idx] != media_token_id
-                ):
+                while token_idx < labels.shape[1] and labels[i][token_idx] != media_token_id:
                     labels[i][token_idx] = -100
                     token_idx += 1
 
@@ -171,29 +158,19 @@ def train_one_epoch(
         divided_loss_mmc4 = loss_mmc4 / args.gradient_accumulation_steps
         (divided_loss_mmc4 * args.loss_multiplier_mmc4).backward()
 
-        if (not args.freeze_lm_embeddings) and (
-            not args.fsdp or args.fsdp_use_orig_params
-        ):
+        if (not args.freeze_lm_embeddings) and (not args.fsdp or args.fsdp_use_orig_params):
             # Mask gradients for input embeddings s.t. we only update the added tokens <image> and <|endofchunk|>
             if args.fsdp:
                 embed_grad = model.lang_encoder.get_input_embeddings().weight.grad
             else:
-                embed_grad = (
-                    model.module.lang_encoder.get_input_embeddings().weight.grad
-                )
+                embed_grad = model.module.lang_encoder.get_input_embeddings().weight.grad
             zero_mask = torch.zeros_like(embed_grad)
             zero_mask[media_token_id] = torch.ones_like(zero_mask[media_token_id])
-            zero_mask[endofchunk_token_id] = torch.ones_like(
-                zero_mask[endofchunk_token_id]
-            )
+            zero_mask[endofchunk_token_id] = torch.ones_like(zero_mask[endofchunk_token_id])
             if args.fsdp:
-                model.lang_encoder.get_input_embeddings().weight.grad = (
-                    embed_grad * zero_mask
-                )
+                model.lang_encoder.get_input_embeddings().weight.grad = embed_grad * zero_mask
             else:
-                model.module.lang_encoder.get_input_embeddings().weight.grad = (
-                    embed_grad * zero_mask
-                )
+                model.module.lang_encoder.get_input_embeddings().weight.grad = embed_grad * zero_mask
 
         # clip gradient norm
         if args.fsdp:
@@ -208,9 +185,7 @@ def train_one_epoch(
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 
         # step optimizer and log
-        if (((num_steps + 1) % args.gradient_accumulation_steps) == 0) or (
-            num_steps == num_batches_per_epoch - 1
-        ):
+        if (((num_steps + 1) % args.gradient_accumulation_steps) == 0) or (num_steps == num_batches_per_epoch - 1):
             optimizer.step()
             lr_scheduler.step()
             optimizer.zero_grad(set_to_none=True)
@@ -222,26 +197,16 @@ def train_one_epoch(
             # rank 0 logging
             if args.rank == 0 and args.report_to_wandb:
                 laion_samples_per_second = (
-                    args.gradient_accumulation_steps
-                    * args.batch_size_laion
-                    * args.world_size
-                    / step_time_m.val
+                    args.gradient_accumulation_steps * args.batch_size_laion * args.world_size / step_time_m.val
                 )
                 laion_samples_per_second_per_gpu = (
-                    args.gradient_accumulation_steps
-                    * args.batch_size_laion
-                    / step_time_m.val
+                    args.gradient_accumulation_steps * args.batch_size_laion / step_time_m.val
                 )
                 c4_samples_per_second = (
-                    args.gradient_accumulation_steps
-                    * args.batch_size_mmc4
-                    * args.world_size
-                    / step_time_m.val
+                    args.gradient_accumulation_steps * args.batch_size_mmc4 * args.world_size / step_time_m.val
                 )
                 c4_samples_per_second_per_gpu = (
-                    args.gradient_accumulation_steps
-                    * args.batch_size_mmc4
-                    / step_time_m.val
+                    args.gradient_accumulation_steps * args.batch_size_mmc4 / step_time_m.val
                 )
                 wandb.log(
                     {
@@ -273,7 +238,7 @@ def train_one_epoch(
         # Log loss to console
         if ((num_steps + 1) % args.logging_steps == 0) and args.rank == 0:
             print(
-                f"Step {num_steps+1}/{num_batches_per_epoch} of epoch {epoch+1}/{args.num_epochs} complete. Loss LAION: {loss_laion.item():.3f} // Loss MMC4: {loss_mmc4.item():.3f}"
+                f"Step {num_steps + 1}/{num_batches_per_epoch} of epoch {epoch + 1}/{args.num_epochs} complete. Loss LAION: {loss_laion.item():.3f} // Loss MMC4: {loss_mmc4.item():.3f}"
             )
 
 
@@ -372,4 +337,4 @@ def save_checkpoint(model, optimizer, lr_scheduler, epoch, args):
 
         if args.delete_previous_checkpoint:
             if epoch > 0:
-                os.remove(f"{args.run_name}/checkpoint_{epoch-1}.pt")
+                os.remove(f"{args.run_name}/checkpoint_{epoch - 1}.pt")

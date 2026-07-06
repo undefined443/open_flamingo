@@ -31,7 +31,6 @@ from classification_utils import (
 from eval_model import BaseEvalModel
 
 from ok_vqa_utils import postprocess_ok_vqa_generation
-from open_flamingo.src.flamingo import Flamingo
 from vqa_metric import compute_vqa_accuracy, postprocess_vqa_generation
 
 from open_flamingo.train.distributed import init_distributed_device, world_info_from_env
@@ -44,9 +43,7 @@ parser.add_argument(
     help="Model name. Currently only `OpenFlamingo` is supported.",
     default="open_flamingo",
 )
-parser.add_argument(
-    "--results_file", type=str, default=None, help="JSON file to save results"
-)
+parser.add_argument("--results_file", type=str, default=None, help="JSON file to save results")
 
 # Trial arguments
 parser.add_argument("--shots", nargs="+", default=[0, 4, 8, 16, 32], type=int)
@@ -69,9 +66,7 @@ parser.add_argument(
     default=-1,
     help="Number of samples to evaluate on. -1 for all samples.",
 )
-parser.add_argument(
-    "--query_set_size", type=int, default=2048, help="Size of demonstration query set"
-)
+parser.add_argument("--query_set_size", type=int, default=2048, help="Size of demonstration query set")
 
 parser.add_argument("--batch_size", type=int, default=8)
 
@@ -373,9 +368,7 @@ parser.add_argument(
     type=str,
     help="url used to set up distributed training",
 )
-parser.add_argument(
-    "--dist-backend", default="nccl", type=str, help="distributed backend"
-)
+parser.add_argument("--dist-backend", default="nccl", type=str, help="distributed backend")
 parser.add_argument(
     "--horovod",
     default=False,
@@ -394,9 +387,7 @@ def main():
     args, leftovers = parser.parse_known_args()
     module = importlib.import_module(f"open_flamingo.eval.models.{args.model}")
 
-    model_args = {
-        leftovers[i].lstrip("-"): leftovers[i + 1] for i in range(0, len(leftovers), 2)
-    }
+    model_args = {leftovers[i].lstrip("-"): leftovers[i + 1] for i in range(0, len(leftovers), 2)}
     eval_model = module.EvalModel(model_args)
 
     # set up distributed evaluation
@@ -418,9 +409,7 @@ def main():
 
         # load cached demonstration features for RICES
         if args.cached_demonstration_features is not None:
-            cached_features = torch.load(
-                f"{args.cached_demonstration_features}/flickr30.pkl", map_location="cpu"
-            )
+            cached_features = torch.load(f"{args.cached_demonstration_features}/flickr30.pkl", map_location="cpu")
         else:
             cached_features = None
 
@@ -455,9 +444,7 @@ def main():
 
         # load cached demonstration features for RICES
         if args.cached_demonstration_features is not None:
-            cached_features = torch.load(
-                f"{args.cached_demonstration_features}/coco.pkl", map_location="cpu"
-            )
+            cached_features = torch.load(f"{args.cached_demonstration_features}/coco.pkl", map_location="cpu")
         else:
             cached_features = None
 
@@ -492,9 +479,7 @@ def main():
 
         # load cached demonstration features for RICES
         if args.cached_demonstration_features is not None:
-            cached_features = torch.load(
-                f"{args.cached_demonstration_features}/ok_vqa.pkl", map_location="cpu"
-            )
+            cached_features = torch.load(f"{args.cached_demonstration_features}/ok_vqa.pkl", map_location="cpu")
         else:
             cached_features = None
 
@@ -529,9 +514,7 @@ def main():
 
         # load cached demonstration features for RICES
         if args.cached_demonstration_features is not None:
-            cached_features = torch.load(
-                f"{args.cached_demonstration_features}/vqav2.pkl", map_location="cpu"
-            )
+            cached_features = torch.load(f"{args.cached_demonstration_features}/vqav2.pkl", map_location="cpu")
         else:
             cached_features = None
 
@@ -566,9 +549,7 @@ def main():
 
         # load cached demonstration features for RICES
         if args.cached_demonstration_features is not None:
-            cached_features = torch.load(
-                f"{args.cached_demonstration_features}/vizwiz.pkl", map_location="cpu"
-            )
+            cached_features = torch.load(f"{args.cached_demonstration_features}/vizwiz.pkl", map_location="cpu")
         else:
             cached_features = None
 
@@ -603,9 +584,7 @@ def main():
 
         # load cached demonstration features for RICES
         if args.cached_demonstration_features is not None:
-            cached_features = torch.load(
-                f"{args.cached_demonstration_features}/textvqa.pkl", map_location="cpu"
-            )
+            cached_features = torch.load(f"{args.cached_demonstration_features}/textvqa.pkl", map_location="cpu")
         else:
             cached_features = None
 
@@ -641,9 +620,7 @@ def main():
 
         # load cached demonstration features for RICES
         if args.cached_demonstration_features is not None:
-            cached_features = torch.load(
-                f"{args.cached_demonstration_features}/imagenet.pkl", map_location="cpu"
-            )
+            cached_features = torch.load(f"{args.cached_demonstration_features}/imagenet.pkl", map_location="cpu")
         else:
             cached_features = None
 
@@ -661,10 +638,7 @@ def main():
                     use_prompt_ensembling=args.classification_prompt_ensembling,
                 )
                 if args.rank == 0:
-                    print(
-                        f"Shots {shot} Trial {trial} "
-                        f"ImageNet score: {imagenet_score}"
-                    )
+                    print(f"Shots {shot} Trial {trial} ImageNet score: {imagenet_score}")
                     scores.append(imagenet_score)
 
             if args.rank == 0:
@@ -703,10 +677,7 @@ def main():
                     cached_features=cached_features,
                 )
                 if args.rank == 0:
-                    print(
-                        f"Shots {shot} Trial {trial} "
-                        f"Hateful Memes score: {hateful_memes_score}"
-                    )
+                    print(f"Shots {shot} Trial {trial} Hateful Memes score: {hateful_memes_score}")
                     scores.append(hateful_memes_score)
 
             if args.rank == 0:
@@ -828,10 +799,7 @@ def evaluate_captioning(
             batch_images.append(context_images + [batch["image"][i]])
 
             context_text = "".join(
-                [
-                    eval_model.get_caption_prompt(caption=x["caption"].strip()) + "\n"
-                    for x in batch_demo_samples[i]
-                ]
+                [eval_model.get_caption_prompt(caption=x["caption"].strip()) + "\n" for x in batch_demo_samples[i]]
             )
 
             # Keep the text but remove the image tags for the zero-shot case
@@ -849,9 +817,7 @@ def evaluate_captioning(
             length_penalty=length_penalty,
         )
 
-        new_predictions = [
-            postprocess_captioning_generation(out).replace('"', "") for out in outputs
-        ]
+        new_predictions = [postprocess_captioning_generation(out).replace('"', "") for out in outputs]
 
         for i, sample_id in enumerate(batch["image_id"]):
             predictions[sample_id] = {
@@ -865,9 +831,7 @@ def evaluate_captioning(
     if args.rank != 0:
         return None
 
-    all_predictions = {
-        k: v for d in all_predictions for k, v in d.items()
-    }  # merge dicts
+    all_predictions = {k: v for d in all_predictions for k, v in d.items()}  # merge dicts
 
     # save the predictions to a temporary file
     results_path = f"{dataset_name}results_{uuid.uuid4()}.json"
@@ -875,10 +839,7 @@ def evaluate_captioning(
     with open(results_path, "w") as f:
         f.write(
             json.dumps(
-                [
-                    {"image_id": k, "caption": all_predictions[k]["caption"]}
-                    for k in all_predictions
-                ],
+                [{"image_id": k, "caption": all_predictions[k]["caption"]} for k in all_predictions],
                 indent=4,
             )
         )
@@ -1017,10 +978,7 @@ def evaluate_vqa(
 
             context_text = "".join(
                 [
-                    eval_model.get_vqa_prompt(
-                        question=x["question"], answer=x["answers"][0]
-                    )
-                    + "\n"
+                    eval_model.get_vqa_prompt(question=x["question"], answer=x["answers"][0]) + "\n"
                     for x in batch_demo_samples[i]
                 ]
             )
@@ -1029,9 +987,7 @@ def evaluate_vqa(
             if num_shots == 0:
                 context_text = context_text.replace("<image>", "")
 
-            batch_text.append(
-                context_text + eval_model.get_vqa_prompt(question=batch["question"][i])
-            )
+            batch_text.append(context_text + eval_model.get_vqa_prompt(question=batch["question"][i]))
 
         outputs = eval_model.get_outputs(
             batch_images=batch_images,
@@ -1042,11 +998,7 @@ def evaluate_vqa(
             length_penalty=length_penalty,
         )
 
-        process_function = (
-            postprocess_ok_vqa_generation
-            if dataset_name == "ok_vqa"
-            else postprocess_vqa_generation
-        )
+        process_function = postprocess_ok_vqa_generation if dataset_name == "ok_vqa" else postprocess_vqa_generation
 
         new_predictions = map(process_function, outputs)
 
@@ -1060,9 +1012,7 @@ def evaluate_vqa(
     if args.rank != 0:
         return None
 
-    all_predictions = [
-        item for sublist in all_predictions for item in sublist
-    ]  # flatten
+    all_predictions = [item for sublist in all_predictions for item in sublist]  # flatten
 
     # save the predictions to a temporary file
     random_uuid = str(uuid.uuid4())
@@ -1094,9 +1044,7 @@ def evaluate_vqa(
 
             fill_fn = fill_vizwiz_test_json
         else:
-            print(
-                "Temporary file saved to ", f"{dataset_name}results_{random_uuid}.json"
-            )
+            print("Temporary file saved to ", f"{dataset_name}results_{random_uuid}.json")
             return
 
         fill_fn(
@@ -1140,14 +1088,15 @@ def evaluate_classification(
         float: accuracy score
     """
     if args.model != "open_flamingo":
-        raise NotImplementedError(
-            "evaluate_classification is currently only supported for OpenFlamingo"
-        )
+        raise NotImplementedError("evaluate_classification is currently only supported for OpenFlamingo")
 
     if dataset_name == "imagenet":
         train_dataset = ImageNetDataset(os.path.join(args.imagenet_root, "train"))
         test_dataset = ImageNetDataset(os.path.join(args.imagenet_root, "val"))
-        prompt_fn = lambda x: eval_model.get_imagenet_prompt(label=x["class_name"])
+
+        def prompt_fn(x):
+            return eval_model.get_imagenet_prompt(label=x["class_name"])
+
         all_class_names = IMAGENET_CLASSNAMES
         k = 5
     elif dataset_name == "hateful_memes":
@@ -1159,9 +1108,10 @@ def evaluate_classification(
             args.hateful_memes_image_dir_path,
             args.hateful_memes_test_annotations_json_path,
         )
-        prompt_fn = lambda x: eval_model.get_hateful_memes_prompt(
-            text=x["ocr"], label=x["class_name"]
-        )
+
+        def prompt_fn(x):
+            return eval_model.get_hateful_memes_prompt(text=x["ocr"], label=x["class_name"])
+
         all_class_names = HM_CLASSNAMES
         k = 1
     else:
@@ -1206,9 +1156,7 @@ def evaluate_classification(
             )
 
         # set up prompt ensembling
-        num_permutations = (
-            min(6, math.factorial(effective_num_shots)) if use_prompt_ensembling else 1
-        )
+        num_permutations = min(6, math.factorial(effective_num_shots)) if use_prompt_ensembling else 1
         logprobs = []
         for _ in range(num_permutations):
             batch_images, batch_text = [], []
@@ -1228,10 +1176,7 @@ def evaluate_classification(
                 if num_shots == 0:
                     context_text = context_text.replace("<image>", "")
 
-                batch_text.append(
-                    context_text
-                    + prompt_fn({"ocr": batch["ocr"][i], "class_name": None})
-                )
+                batch_text.append(context_text + prompt_fn({"ocr": batch["ocr"][i], "class_name": None}))
 
             # get predicted class names
             logprobs.append(
@@ -1256,9 +1201,7 @@ def evaluate_classification(
         # compute accuracy
         for i, topk in enumerate(predicted_classnames):
             y_i = batch["class_name"][i]
-            score = torch.exp(
-                predicted_logprobs[i][0] - torch.logsumexp(logprobs[i], dim=0)
-            ).item()
+            score = torch.exp(predicted_logprobs[i][0] - torch.logsumexp(logprobs[i], dim=0)).item()
             predictions.append(
                 {
                     "id": batch["id"][i],
@@ -1274,26 +1217,20 @@ def evaluate_classification(
     if args.rank != 0:
         return
 
-    all_predictions = [
-        item for sublist in all_predictions for item in sublist
-    ]  # flatten
+    all_predictions = [item for sublist in all_predictions for item in sublist]  # flatten
 
     if dataset_name == "hateful_memes":
         # return ROC-AUC score
         greater_label = max(all_class_names)
         gts = [pred["gt_label"] for pred in all_predictions]
         pred_scores = [
-            pred["pred_score"]
-            if pred["pred_label"] == greater_label
-            else 1 - pred["pred_score"]
+            pred["pred_score"] if pred["pred_label"] == greater_label else 1 - pred["pred_score"]
             for pred in all_predictions
         ]
         return roc_auc_score(gts, pred_scores)
     else:
         # return top-1 accuracy
-        acc1 = sum(
-            int(pred["gt_label"] == pred["pred_label"]) for pred in all_predictions
-        )
+        acc1 = sum(int(pred["gt_label"] == pred["pred_label"]) for pred in all_predictions)
         return float(acc1) / len(all_predictions)
 
 

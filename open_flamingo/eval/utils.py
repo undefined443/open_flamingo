@@ -98,9 +98,7 @@ def get_predicted_classnames(logprobs, k, class_id_to_name):
     """
     # convert indices to classnames
     _, predictions = torch.topk(logprobs, k=k, dim=1)  # shape (B, k)
-    predicted_classnames = [
-        [class_id_to_name[ix] for ix in item] for item in predictions.tolist()
-    ]
+    predicted_classnames = [[class_id_to_name[ix] for ix in item] for item in predictions.tolist()]
     predicted_logprobs = torch.gather(logprobs, 1, predictions)
     return predicted_classnames, predicted_logprobs
 

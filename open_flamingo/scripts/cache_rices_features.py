@@ -1,6 +1,7 @@
 """
 Cache CLIP features for all images in training split in preparation for RICES
 """
+
 import argparse
 import sys
 import os
@@ -15,7 +16,6 @@ from eval.rices import RICES
 from eval.eval_datasets import (
     CaptionDataset,
     VQADataset,
-    ImageNetDataset,
     HatefulMemesDataset,
 )
 import os

@@ -12,9 +12,7 @@ from dataclasses import dataclass
 from multiprocessing import Value
 
 import braceexpand
-import numpy as np
 import webdataset as wds
-from PIL import Image
 from torch.utils.data import DataLoader, IterableDataset, get_worker_info
 from torch.utils.data.distributed import DistributedSampler
 from webdataset.filters import _shuffle
@@ -26,7 +24,7 @@ from webdataset.tariterators import (
 )
 
 try:
-    import horovod.torch as hvd
+    import horovod.torch as hvd  # pyright: ignore[reportMissingImports]
 except ImportError:
     hvd = None
 
@@ -63,12 +61,7 @@ def get_dataset_size(shards):
     if os.path.exists(sizes_filename):
         sizes = json.load(open(sizes_filename, "r"))
         total_size = sum(
-            [
-                int(sizes[os.path.basename(shard)])
-                if os.path.basename(shard) in sizes
-                else 0
-                for shard in shards_list
-            ]
+            [int(sizes[os.path.basename(shard)]) if os.path.basename(shard) in sizes else 0 for shard in shards_list]
         )
     elif os.path.exists(len_filename):
         # FIXME this used to be eval(open(...)) but that seemed rather unsafe
@@ -100,9 +93,7 @@ def log_and_continue(exn):
     return True
 
 
-def group_by_keys_nothrow(
-    data, keys=base_plus_ext, lcase=True, suffixes=None, handler=None
-):
+def group_by_keys_nothrow(data, keys=base_plus_ext, lcase=True, suffixes=None, handler=None):
     """Return function over iterator that groups key, value pairs into samples.
 
     :param keys: function that splits the key into key and extension (base_plus_ext)
@@ -120,11 +111,7 @@ def group_by_keys_nothrow(
         # FIXME webdataset version throws if suffix in current_sample, but we have a potential for
         #  this happening in the current LAION400m dataset if a tar ends with same prefix as the next
         #  begins, rare, but can happen since prefix aren't unique across tar files in that dataset
-        if (
-            current_sample is None
-            or prefix != current_sample["__key__"]
-            or suffix in current_sample
-        ):
+        if current_sample is None or prefix != current_sample["__key__"] or suffix in current_sample:
             if valid_sample(current_sample):
                 yield current_sample
             current_sample = dict(__key__=prefix, __url__=filesample["__url__"])
