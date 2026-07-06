@@ -1,5 +1,5 @@
 # OpenFlamingo Training
-To train OpenFlamingo, please ensure your environment matches that of `environment.yml`.
+To train OpenFlamingo, install the training dependencies with `uv sync --extra training` (see `pyproject.toml`).
 
 ## Data
 Our codebase uses [WebDataset](https://github.com/webdataset/webdataset) to efficiently load `.tar` files containing image and text sequences. We recommend resampling shards with replacement during training using the `--dataset_resampled` flag. 
