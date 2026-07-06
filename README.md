@@ -31,9 +31,9 @@ To install the package in an existing environment, run
 pip install open-flamingo
 ```
 
-or to create a conda environment for running OpenFlamingo, run
+or to set up a development environment with [uv](https://docs.astral.sh/uv/), run
 ```
-conda env create -f environment.yml
+uv sync
 ```
 
 To install training or eval dependencies, run one of the first two commands. To install everything, run the third command.
@@ -43,12 +43,14 @@ pip install open-flamingo[eval]
 pip install open-flamingo[all]
 ```
 
-There are three `requirements.txt` files: 
-- `requirements.txt` 
-- `requirements-training.txt`
-- `requirements-eval.txt`
+or with uv:
+```
+uv sync --extra training
+uv sync --extra eval
+uv sync --extra all
+```
 
-Depending on your use case, you can install any of these with `pip install -r <requirements-file.txt>`. The base file contains only the dependencies needed for running the model.
+Dependencies are declared in `pyproject.toml` under the `training`, `eval` and `all` extras. Note that the `eval` extra depends on `pycocoevalcap`, whose METEOR/SPICE scorers require a Java runtime (`openjdk`) installed on your system.
 
 ## Development
 

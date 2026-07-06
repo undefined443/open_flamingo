@@ -1,17 +1,16 @@
-install: ## [Local development] Upgrade pip, install requirements, install package.
-	python -m pip install -U pip
-	python -m pip install -e .
+install: ## [Local development] Install package.
+	uv sync
 
-install-dev: ## [Local development] Install test requirements
-	python -m pip install -r requirements-dev.txt
+install-dev: ## [Local development] Install package with dev dependency group
+	uv sync --group dev
 
 lint: ## [Local development] Run mypy, pylint and black
-	python -m mypy open_flamingo
-	python -m pylint open_flamingo
-	python -m black --check -l 120 open_flamingo
+	uv run mypy open_flamingo
+	uv run pylint open_flamingo
+	uv run black --check -l 120 open_flamingo
 
 black: ## [Local development] Auto-format python code using black
-	python -m black -l 120 .
+	uv run black -l 120 .
 
 .PHONY: help
 

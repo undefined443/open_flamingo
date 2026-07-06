@@ -1,0 +1,81 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "open_flamingo"
+version = "2.0.1"
+description = "An open-source framework for training large multimodal models"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = "~=3.13.0"
+keywords = ["machine learning"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "einops",
+    "einops-exts",
+    "transformers>=4.28.1",
+    "torch",
+    "pillow",
+    "open_clip_torch>=2.16.0",
+    "sentencepiece",
+]
+
+[project.optional-dependencies]
+eval = [
+    "scipy",
+    "torchvision",
+    "nltk",
+    "inflection",
+    "pycocoevalcap",
+    "pycocotools",
+    "tqdm",
+    "scikit-learn",
+]
+training = [
+    "wandb",
+    "torchvision",
+    "braceexpand",
+    "webdataset",
+    "tqdm",
+]
+all = [
+    "scipy",
+    "torchvision",
+    "nltk",
+    "inflection",
+    "pycocoevalcap",
+    "pycocotools",
+    "tqdm",
+    "scikit-learn",
+    "wandb",
+    "braceexpand",
+    "webdataset",
+]
+
+[dependency-groups]
+dev = [
+    "black",
+    "mypy",
+    "pylint",
+    "pytest",
+    "requests",
+]
+
+[tool.setuptools.packages.find]
+include = ["open_flamingo*"]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu132" }
+torchvision = { index = "pytorch-cu132" }
+
+[[tool.uv.index]]
+name = "pytorch-cu132"
+url = "https://download.pytorch.org/whl/cu132"
+explicit = true
