@@ -33,10 +33,14 @@ def get_mp_policy_dtype(precision: str):
 
 def get_autocast(precision, cache_enabled=True):
     if precision == "amp":
-        return lambda: torch.cuda.amp.autocast(cache_enabled=cache_enabled)
+        return lambda: torch.amp.autocast(  # pyright: ignore[reportPrivateImportUsage]
+            "cuda", cache_enabled=cache_enabled
+        )
     elif precision == "amp_bfloat16" or precision == "amp_bf16":
         # amp_bfloat16 is more stable than amp float16 for clip training
-        return lambda: torch.cuda.amp.autocast(dtype=torch.bfloat16, cache_enabled=cache_enabled)
+        return lambda: torch.amp.autocast(  # pyright: ignore[reportPrivateImportUsage]
+            "cuda", dtype=torch.bfloat16, cache_enabled=cache_enabled
+        )
     else:
         return suppress
 
